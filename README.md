@@ -19,11 +19,10 @@ PE-Viewer工具可以方便地查看可执行文件的信息，当前流行的PE
 
 二进制文件读写主要用到了fseek(),fread(),fgets()三个函数。fseek()用来调整文件指针指向的位置；fread()用来将文件中的数据块读入到变量中；fgets()用于读取文件中的字符串。读取整个头文件信息时，我们不需要对结构体变量一个一个复制，而是可以利用C语言结构体在内存中存储结构紧邻的特性，将一整块数据直接复制到结构体指针所指的区域中，这样减少指令的数目，提高效率。如下图所示：
 
-![img](自制PEview/wps1.jpg) 
-
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps1.jpg?raw=true) 
  
 
-![img](自制PEview/wps2.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps2.jpg?raw=true) 
 
  
 
@@ -31,7 +30,7 @@ PE-Viewer工具可以方便地查看可执行文件的信息，当前流行的PE
 
 《逆向工程核心原理》将PE文件的“头”分为DOS头，NT头，和节区头，其中NT头还包含文件头和可选头。他们都有其自己的结构。由于他们结构体都较大，并且后一个头的初始化会依赖于前几个头的数据，初始化函数需要传递很多参数，这时候传递指针的效率要远高于传递数值。下图是PE文件在磁盘与虚拟内存中的映射，PE头部分主要在下面三块。
 
-![img](自制PEview/wps3.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps3.jpg?raw=true) 
 
 ### **初始化DOS头**
 
@@ -43,7 +42,7 @@ DOS头中需要关注的两个字段为：e_magic和e_lfanew，前者的值被�
 
 PE头部分的数据，它的物理地址偏移与虚拟地址偏移是相同的。所以可以直接通过前面求出的e_lfanew的值确定NT头的偏移位置，然后将其整块读取到结构体中。
 
-![img](自制PEview/wps4.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps4.jpg?raw=true) 
 
 NT头结构体包含三部分，分别是标识，文件头，可选头。
 
@@ -91,7 +90,7 @@ IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];//结构体
 
 节区头的数量可以从文件头的NumberOfSections成员得出。一个节区头对应一个节区，不同节区有不同的功能。最常见的如.data存放数据，.text存放指令。因为节区数一开始并不知道，所以不能直接定义节区头的大小，这里我定义了一个指针数组，确定节区数后先给数组中每个指针分配，在给每个指针所指的节区分配内存。
 
-![img](自制PEview/wps5.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps5.jpg?raw=true) 
 
 后来我想到一种更简单的结构，因为节区头中一个个结构是紧连着的，所以我直接用一个结构体指针就行了。但因为代码已经成型，修改起来非常困难，加上用原来用的方法也不会很差，就保留了原来的实现方式。
 
@@ -117,11 +116,11 @@ DWORD  Characteristics; //节的属性
 
 初始化节区头后，就可以将各个节区的数据输出了：
 
-![img](自制PEview/wps6.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps6.jpg?raw=true) 
 
 根据各个节区的大小，RVA，RAW，以及可选头中的FileAlignment和SectionAlignment成员计算出任何一处虚拟地址对应的物理地址。
 
-![img](自制PEview/wps7.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps7.jpg?raw=true) 
 
  
 
@@ -156,7 +155,7 @@ typedef	struct _IMAGE_IMPORT_DESCRIPTOR {//IID
 
 ### **函数载入**
 
-![img](自制PEview/wps8.png) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps8.jpg?raw=true) 
 
 1. 读取IID“Name”成员，获取库名称字符串“USER32.dll”
 2. 装载相应库->LoadLibrary(“USER32.dll”)
@@ -202,7 +201,7 @@ typedef struct _IMAGE_IMPORT_INFO {
 
 为了更方便地读取信息，我打算先将各个THUNK数组的值提取出来，以指针数组为索引。具体过程是先通过输入表结构体中的OriginalFirstThunk成员减去RVA_2_RAW得到数组的文件偏移地址。这里碰到一个问题是不知道THUNK数组的大小，只知道它的结尾THUNK值为0。
 
-![img](自制PEview/wps9.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps9.jpg?raw=true) 
 
 这里其实可以用链表，用fread扫描，扫到一个THUNK就将它串到链表中，直到扫到一个全零的THUNK值停止。但因为链表要另外定义链表结构体，且这里可能会有很多个链表，到时候得用指针数组作为索引，不是很方便。所以这里我还是用数组处理，方法是设置一个计数器和一个临时变量，将每次fread出来的内容存到临时变量中，令计数器自增一，直到fread到临时变量中的值为0。然后再根据最后计数器的值申请内存，将一整块的数据全部fread数组中（注意，最后面THUNK值为0的部分也要read进来，作为之后遍历时的终止条件）。
 
@@ -210,13 +209,13 @@ typedef struct _IMAGE_IMPORT_INFO {
 
 完成了前面的工作，输入函数就很容易求了:
 
-![img](自制PEview/wps10.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps10.jpg?raw=true) 
 
 先通过IID中的Name成员即可索引到表示DLL库名的字符串。
 
 利用前面求出的THUNK数组可以索引到IMPORT_BY_NAME的结构体，前一个WORD是函数的序号，用fread读出；后面跟着一串字符串，用fgets读出。将它们打印出来效果如下：
 
-![img](自制PEview/wps11.jpg) 
+![img](https://github.com/Darclindy/FileViewer/blob/master/%E8%87%AA%E5%88%B6PEView/wps11.jpg?raw=true) 
 
 ## **5.其他功能**
 
